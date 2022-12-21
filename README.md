@@ -1,6 +1,6 @@
-# Getting Started app for Discord
+# StoatBot for Discord Test
 
-This project contains a basic rock-paper-scissors-style Discord app written in JavaScript, built for the [getting started guide](https://discord.com/developers/docs/getting-started).
+This project was copied from a basic rock-paper-scissors-style Discord app written in JavaScript, built for the [getting started guide](https://discord.com/developers/docs/getting-started).
 
 ![Demo of app](https://raw.githubusercontent.com/discord/discord-example-app/main/assets/getting-started-demo.gif)
 

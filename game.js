@@ -101,3 +101,18 @@ export function getShuffledOptions() {
 
   return options.sort(() => Math.random() - 0.5);
 }
+
+
+// types of info to collect
+const infoChoices = {
+  timezone: {
+    description: 'Where do you live?!',
+  },
+  test: {
+    description: 'test',
+  },
+};
+
+export function getInfoChoices() {
+  return Object.keys(infoChoices);
+}
