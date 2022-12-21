@@ -1,4 +1,4 @@
-import { getRPSChoices } from './game.js';
+import { getInfoChoices } from './game.js';
 import { capitalize, DiscordRequest } from './utils.js';
 
 export async function HasGuildCommands(appId, guildId, commands) {
@@ -45,7 +45,7 @@ export async function InstallGuildCommand(appId, guildId, command) {
 
 // Get the game choices from game.js
 function createCommandChoices() {
-  const choices = getRPSChoices();
+  const choices = getInfoChoices();
   const commandChoices = [];
 
   for (let choice of choices) {
@@ -65,25 +65,26 @@ export const TEST_COMMAND = {
   type: 1,
 };
 
-// Command containing options
-export const CHALLENGE_COMMAND = {
-  name: 'challenge',
-  description: 'Challenge to a match of rock paper scissors',
+// Command returns time
+export const TIME_COMMAND = {
+  name: 'time',
+  description: 'timestamps!',
+  type: 1,
+};
+
+
+// Command for setting info
+export const ABOUT_ME_COMMAND = {
+  name: 'aboutme',
+  description: 'set personal info',
   options: [
     {
       type: 3,
-      name: 'object',
-      description: 'Pick your object',
+      name: 'info',
+      description: 'which info',
       required: true,
       choices: createCommandChoices(),
     },
   ],
-  type: 1,
-};
-
-// Command containing options
-export const TIME_COMMAND = {
-  name: 'time',
-  description: 'timestamps!',
   type: 1,
 };
