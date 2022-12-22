@@ -15,6 +15,8 @@ import {
   HasGuildCommands,
 } from './commands.js';
 
+import loki from "lokijs"; //import loki
+
 // Create an express app
 const app = express();
 // Get port, or default to 3000
@@ -24,6 +26,31 @@ app.use(express.json({ verify: VerifyDiscordRequest(process.env.PUBLIC_KEY) }));
 
 // Store for in-progress games. In production, you'd want to use a DB
 const activeGames = {};
+
+// Setup loki DB
+var db = new loki('./.data/quickstart.db', {
+    autoload: true,
+    autoloadCallback : databaseInitialize,
+    autosave: true, 
+    autosaveInterval: 4000
+});
+
+// implement the autoloadback referenced in loki constructor
+function databaseInitialize() {
+  var entries = db.getCollection("entries");
+  if (entries === null) {
+    entries = db.addCollection("entries");
+  }
+
+  // kick off any program logic or start listening to external events
+  runProgramLogic();
+}
+
+// example method with any bootstrap logic to run after database initialized
+function runProgramLogic() {
+  var entryCount = db.getCollection("entries").count();
+  console.log("number of entries in database : " + entryCount);
+}
 
 /**
  * Interactions endpoint URL where Discord will send HTTP requests
