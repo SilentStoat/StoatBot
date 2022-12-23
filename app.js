@@ -50,7 +50,7 @@ function databaseInitialize() {
 function runProgramLogic() {
   var entryCount = db.getCollection("entries").count();
   console.log("number of entries in database : " + entryCount);
-}
+  }
 
 /**
  * Interactions endpoint URL where Discord will send HTTP requests
@@ -74,13 +74,19 @@ app.post('/interactions', async function (req, res) {
     const { name } = data;
 
     // "test" guild command
-    if (name === 'test') {
+    if (name === 'test') {      
+      //const userId = req.body.member.user.id;
+      const userId = req.body.data.options[0].value;
+      var entries = db.getCollection("entries");
+      var results = entries.findOne({ id: userId });
+      console.log("results : " + results);
+      
       // Send a message into the channel where command was triggered from
       return res.send({
         type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
         data: {
           // Fetches a random emoji to send from a helper function
-          content: 'hello world ' + getRandomEmoji(),
+          content: results.locale,
         },
       });
     }
@@ -97,12 +103,27 @@ app.post('/interactions', async function (req, res) {
       });
     }
     
-    // "aboout me" guild command
+    // "about me" guild command
     if (name === "aboutme" && id) {
+      // Get user ID
       const userId = req.body.member.user.id;
       // User's object choice
       const objectName = req.body.data.options[0].value;
-
+      // get entries collection
+      var entries = db.getCollection("entries");
+      // check if user id exists
+      var result = entries.findOne({ id: userId });
+      
+      if (result) {
+        //if exists get doc and update
+        var doc = entries.by("id", userId);
+        doc.locale = objectName;
+        entries.update(doc)
+      } else {
+        //if doesn't exist, create doc
+        entries.insert({id: userId, locale: objectName});
+      }
+      
       // Create active game using message ID as the game ID
       activeGames[id] = {
         id: userId,

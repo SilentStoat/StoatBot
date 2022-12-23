@@ -62,7 +62,14 @@ function createCommandChoices() {
 export const TEST_COMMAND = {
   name: 'test',
   description: 'Basic guild command',
-  type: 1,
+  options: [
+    {
+      "name": "user",
+      "description": "The user to get",
+      "type": 6, // 6 is type USER
+      "required": true
+    },
+  ]
 };
 
 // Command returns time
