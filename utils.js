@@ -48,7 +48,7 @@ export function capitalize(str) {
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
-export function getTime() {
-  let d = new Date(new Date().toLocaleString("en-US", {timeZone: "US/Central"})); // timezone ex: Asia/Jerusalem
-  return "__**Central Time**__\n" + d + "\nlast updated:<t:" + Math.floor(Date.now() / 1000) + ":R>";
+export function getTime(timeZone) {
+  let d = new Date(new Date().toLocaleString("en-US", {timeZone: timeZone})); // timezone ex: Asia/Jerusalem
+  return timeZone + "\n" + d + "\nlast updated:<t:" + Math.floor(Date.now() / 1000) + ":R>";
 }
