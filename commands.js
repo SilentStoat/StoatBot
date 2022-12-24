@@ -95,3 +95,17 @@ export const ABOUT_ME_COMMAND = {
   ],
   type: 1,
 };
+
+// Whenis command
+export const WHEN_IS_COMMAND = {
+  name: 'whenis',
+  description: 'returns users timezone',
+  options: [
+    {
+      "name": "user",
+      "description": "The user to get",
+      "type": 6, // 6 is type USER
+      "required": true
+    },
+  ]
+};
