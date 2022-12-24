@@ -29,29 +29,19 @@ app.use(express.json({ verify: VerifyDiscordRequest(process.env.PUBLIC_KEY) }));
 const activeGames = {};
 
 // Setup loki DB
-var db = new loki('./.data/quickstart.db', {
+var db = new loki('./.data/stoatbot.db', {
     autoload: true,
-    autoloadCallback : databaseInitialize,
     autosave: true, 
     autosaveInterval: 4000
 });
 
 // implement the autoloadback referenced in loki constructor
-function databaseInitialize() {
-  var entries = db.getCollection("entries");
+function databaseInitialize(collection) {
+  var entries = db.getCollection(collection);
   if (entries === null) {
-    entries = db.addCollection("entries");
+    entries = db.addCollection(collection);
   }
-
-  // kick off any program logic or start listening to external events
-  runProgramLogic();
 }
-
-// example method with any bootstrap logic to run after database initialized
-function runProgramLogic() {
-  var entryCount = db.getCollection("entries").count();
-  console.log("number of entries in database : " + entryCount);
-  }
 
 /**
  * Interactions endpoint URL where Discord will send HTTP requests
@@ -78,9 +68,10 @@ app.post('/interactions', async function (req, res) {
     if (name === 'test') {      
       //const userId = req.body.member.user.id;
       const userId = req.body.data.options[0].value;
+      const guildId = req.body.guild_id;
       var entries = db.getCollection("entries");
       var results = entries.findOne({ id: userId });
-      console.log("results : " + results);
+      console.log(guildId);
       
       // Send a message into the channel where command was triggered from
       return res.send({
@@ -108,6 +99,8 @@ app.post('/interactions', async function (req, res) {
     if (name === "aboutme" && id) {
       // Get user ID
       const userId = req.body.member.user.id;
+      // Get guild ID
+      const guildId = req.body.guild_id;
       // User's object choice
       const objectName = req.body.data.options[0].value;
       
@@ -152,20 +145,37 @@ app.post('/interactions', async function (req, res) {
     if (name === 'whenis') {      
       //const userId = req.body.member.user.id;
       const userId = req.body.data.options[0].value;
-      var entries = db.getCollection("entries");
-      var results = entries.findOne({ id: userId });
-      console.log("results : " + results);
+      // Get guild ID
+      const guildId = req.body.guild_id;
+      // build collection name
+      const collectionID = guildId + '_user_info';
+      // initialize collection
+      await databaseInitialize(collectionID);      
+      // get entries collection
+      var userInfos = db.getCollection(collectionID);
+      // find the users entry
+      var result = userInfos.findOne({ id: userId });
       
-      // Send a message into the channel where command was triggered from
-      return res.send({
-        type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-        data: {
-          // Fetches a random emoji to send from a helper function
-          content: getTime(results.locale),
-        },
-      });
-    }
-    
+      if (result) {             
+        // Send a message into the channel where command was triggered from
+        return res.send({
+          type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+          data: {
+            // Fetches a random emoji to send from a helper function
+            content: getTime(result.locale),
+          },
+        });
+      } else {           
+        // Send a message into the channel where command was triggered from
+        return res.send({
+          type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+          data: {
+            // Fetches a random emoji to send from a helper function
+            content: "user hasn't entered that info",
+          },
+        });
+      }
+    }    
   }
   
   /**
@@ -181,21 +191,28 @@ app.post('/interactions', async function (req, res) {
 
       // Get selected option from payload
       const selectedOption = data.values[0];
+      //get user ID
       const userId = req.body.member.user.id;
+      // Get guild ID
+      const guildId = req.body.guild_id;
+      // build collection name
+      const collectionID = guildId + '_user_info';
+      // initialize collection
+      await databaseInitialize(collectionID);
       
       // get entries collection
-      var entries = db.getCollection("entries");
+      var userInfos = db.getCollection(collectionID);
       // check if user id exists
-      var result = entries.findOne({ id: userId });
+      var result = userInfos.findOne({ id: userId });
       
       if (result) {
         //if exists get doc and update
-        var doc = entries.by("id", userId);
+        var doc = userInfos.by("id", userId);
         doc.locale = selectedOption;
-        entries.update(doc)
+        userInfos.update(doc)
       } else {
         //if doesn't exist, create doc
-        entries.insert({id: userId, locale: selectedOption});
+        userInfos.insert({id: userId, locale: selectedOption});
       }
       
       // Send results
