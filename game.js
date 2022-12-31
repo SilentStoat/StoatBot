@@ -108,8 +108,8 @@ const infoChoices = {
   timezone: {
     description: 'Where do you live?!',
   },
-  test: {
-    description: 'test',
+  color: {
+    description: 'Color',
   },
 };
 
