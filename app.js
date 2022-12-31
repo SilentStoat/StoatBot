@@ -103,42 +103,79 @@ app.post('/interactions', async function (req, res) {
       const guildId = req.body.guild_id;
       // User's object choice
       const objectName = req.body.data.options[0].value;
-      
-      return res.send({
-        type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-        data: {
-          content: 'A message with a button',
-          flags: InteractionResponseFlags.EPHEMERAL,
-          // Selects are inside of action rows
-          components: [
-            {
-              type: MessageComponentTypes.ACTION_ROW,
-              components: [
-                {
-                  type: MessageComponentTypes.STRING_SELECT,
-                  // Value for your app to identify the select menu interactions
-                  custom_id: 'my_locale',
-                  // Select options - see https://discord.com/developers/docs/interactions/message-components#select-menu-object-select-option-structure
-                  options: [
-                    {
-                      label: 'US/Central',
-                      value: 'US/Central',
-                      description: 'Central time US gmt -6',
-                    },
-                    {
-                      label: 'US/Eastern',
-                      value: 'US/Eastern',
-                      description: 'Eastern time US gmt -4',
-                    },
-                  ],
-                },
-              ],
-            },
-          ],
-          // Fetches a random emoji to send from a helper function
-          //content: `time change <@${userId}> \n` + userId + '\n' + objectName ,       
-        },
-      });
+      if (objectName == 'timezone') {
+        return res.send({
+          type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+          data: {
+            content: 'A message with a button',
+            flags: InteractionResponseFlags.EPHEMERAL,
+            // Selects are inside of action rows
+            components: [
+              {
+                type: MessageComponentTypes.ACTION_ROW,
+                components: [
+                  {
+                    type: MessageComponentTypes.STRING_SELECT,
+                    // Value for your app to identify the select menu interactions
+                    custom_id: 'my_locale',
+                    // Select options - see https://discord.com/developers/docs/interactions/message-components#select-menu-object-select-option-structure
+                    options: [
+                      {
+                        label: 'US/Central',
+                        value: 'US/Central',
+                        description: 'Central time US gmt -6',
+                      },
+                      {
+                        label: 'US/Eastern',
+                        value: 'US/Eastern',
+                        description: 'Eastern time US gmt -4',
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+            // Fetches a random emoji to send from a helper function
+            //content: `time change <@${userId}> \n` + userId + '\n' + objectName ,       
+          },
+        });
+      } else if (objectName == 'color') {        
+        return res.send({
+          type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+          data: {
+            content: 'A message with a button',
+            flags: InteractionResponseFlags.EPHEMERAL,
+            // Selects are inside of action rows
+            components: [
+              {
+                type: MessageComponentTypes.ACTION_ROW,
+                components: [
+                  {
+                    type: MessageComponentTypes.STRING_SELECT,
+                    // Value for your app to identify the select menu interactions
+                    custom_id: 'my_color',
+                    // Select options - see https://discord.com/developers/docs/interactions/message-components#select-menu-object-select-option-structure
+                    options: [
+                      {
+                        label: 'Blue',
+                        value: 'blue',
+                        description: 'blue',
+                      },
+                      {
+                        label: 'Green',
+                        value: 'green',
+                        description: 'green',
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+            // Fetches a random emoji to send from a helper function
+            //content: `time change <@${userId}> \n` + userId + '\n' + objectName ,       
+          },
+        });
+      }
     }
     
     // "whenis" guild command
@@ -156,15 +193,27 @@ app.post('/interactions', async function (req, res) {
       // find the users entry
       var result = userInfos.findOne({ id: userId });
       
-      if (result) {             
-        // Send a message into the channel where command was triggered from
-        return res.send({
-          type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-          data: {
-            // Fetches a random emoji to send from a helper function
-            content: getTime(result.locale),
-          },
-        });
+      if (result) {        
+        if (result.locale) {
+          // Send a message into the channel where command was triggered from
+          return res.send({
+            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: {
+              // Fetches a random emoji to send from a helper function
+              content: getTime(result.locale),
+              //content: result.color,
+            },
+          });
+        } else {       
+          // Send a message into the channel where command was triggered from
+          return res.send({
+            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: {
+              // Fetches a random emoji to send from a helper function
+              content: "user hasn't entered that info",
+            },
+          });          
+        }
       } else {           
         // Send a message into the channel where command was triggered from
         return res.send({
@@ -213,6 +262,47 @@ app.post('/interactions', async function (req, res) {
       } else {
         //if doesn't exist, create doc
         userInfos.insert({id: userId, locale: selectedOption});
+      }
+      
+      // Send results
+      await res.send({
+        type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+        data: { content: `<@${userId}> selected ${selectedOption}` },
+      });
+      // Update ephemeral message
+      await DiscordRequest(endpoint, {
+        method: "PATCH",
+        body: {
+          content: "Nice choice " + getRandomEmoji(),
+          components: [],
+        },
+      });
+    } else if (componentId === 'my_color') {
+
+      // Get selected option from payload
+      const selectedOption = data.values[0];
+      //get user ID
+      const userId = req.body.member.user.id;
+      // Get guild ID
+      const guildId = req.body.guild_id;
+      // build collection name
+      const collectionID = guildId + '_user_info';
+      // initialize collection
+      await databaseInitialize(collectionID);
+      
+      // get entries collection
+      var userInfos = db.getCollection(collectionID);
+      // check if user id exists
+      var result = userInfos.findOne({ id: userId });
+      
+      if (result) {
+        //if exists get doc and update
+        var doc = userInfos.by("id", userId);
+        doc.color = selectedOption;
+        userInfos.update(doc)
+      } else {
+        //if doesn't exist, create doc
+        userInfos.insert({id: userId, color: selectedOption});
       }
       
       // Send results
