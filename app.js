@@ -18,6 +18,9 @@ import {
 
 import loki from "lokijs"; //import loki
 
+//import Intl from 'full-icu';
+import moment from 'moment-timezone';
+
 // Create an express app
 const app = express();
 // Get port, or default to 3000
@@ -69,16 +72,19 @@ app.post('/interactions', async function (req, res) {
       //const userId = req.body.member.user.id;
       const userId = req.body.data.options[0].value;
       const guildId = req.body.guild_id;
-      var entries = db.getCollection("entries");
-      var results = entries.findOne({ id: userId });
-      console.log(guildId);
-      
+      const userLocale = req.body.locale;
+      //var entries = db.getCollection("entries");
+      //var results = entries.findOne({ id: userId });
+      //console.log(req.body);
+            
+      console.log(moment.tz.countries());
+            
       // Send a message into the channel where command was triggered from
       return res.send({
         type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
         data: {
           // Fetches a random emoji to send from a helper function
-          content: results.locale,
+          content: "test",
         },
       });
     }
@@ -139,7 +145,25 @@ app.post('/interactions', async function (req, res) {
             //content: `time change <@${userId}> \n` + userId + '\n' + objectName ,       
           },
         });
-      } else if (objectName == 'color') {        
+      } else if (objectName == 'color') {
+        
+        //get time
+        const d = new Date();
+        console.log(d.toLocaleTimeString('en-US', { hour: "2-digit", minute: "2-digit" }));
+        d.setMinutes(d.getMinutes() - 720);
+        
+        //build options
+        let options = [];        
+        for(var i=-12; i<13; i++){
+          let option = {};
+          option.label = d.toLocaleTimeString('en-US', { hour: "2-digit", minute: "2-digit" }) + ' ' + i + '';
+          option.value = i * 60;
+          option.description = 'test'
+          options.push(option);
+          d.setMinutes(d.getMinutes() + 60);
+        }
+        //console.log(options);
+        
         return res.send({
           type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
           data: {
@@ -153,18 +177,30 @@ app.post('/interactions', async function (req, res) {
                   {
                     type: MessageComponentTypes.STRING_SELECT,
                     // Value for your app to identify the select menu interactions
-                    custom_id: 'my_color',
+                    custom_id: 'my_Offset',
+                    // Select options - see https://discord.com/developers/docs/interactions/message-components#select-menu-object-select-option-structure
+                    options: options,
+                  },
+                ],
+              },{
+                type: MessageComponentTypes.ACTION_ROW,
+                components: [
+                  {
+                    type: MessageComponentTypes.STRING_SELECT,
+                    // Value for your app to identify the select menu interactions
+                    custom_id: 'my_DST',
                     // Select options - see https://discord.com/developers/docs/interactions/message-components#select-menu-object-select-option-structure
                     options: [
                       {
-                        label: 'Blue',
-                        value: 'blue',
-                        description: 'blue',
+                        label: 'No Day Light Savings',
+                        value: 'False',
+                        description: 'Not suffering from Benjamin Frankin\'s mistakes',
+                        default: true,
                       },
                       {
-                        label: 'Green',
-                        value: 'green',
-                        description: 'green',
+                        label: 'Day Light Savings',
+                        value: 'True',
+                        description: 'Twice a year I timeskip an hour',
                       },
                     ],
                   },
@@ -319,7 +355,7 @@ app.post('/interactions', async function (req, res) {
         },
       });
     }
-  }
+  }  
 });
 
 app.listen(PORT, () => {
