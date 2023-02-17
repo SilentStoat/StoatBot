@@ -46,6 +46,27 @@ function databaseInitialize(collection) {
   }
 }
 
+const tzNames = moment.tz.names();
+const zonesMap = new Map();
+
+for (const name of tzNames) {
+  const isDST = (moment.tz('2020-05-05', name).isDST() || moment.tz('2020-12-12', name).isDST());  
+  const offsets = moment.tz.zone(name).offsets;
+  if (!zonesMap.has(isDST)) {
+    zonesMap.set(isDST, new Map());
+  }
+  
+  for (const offset of offsets) {
+      if (!zonesMap.get(isDST).has(offset)) {
+          zonesMap.get(isDST).set(offset, new Set());
+      }
+
+      zonesMap.get(isDST).get(offset).add(name);
+  }
+}
+
+//console.log(moment.tz.zone('America/Barbados').offsets);
+
 /**
  * Interactions endpoint URL where Discord will send HTTP requests
  */
@@ -76,19 +97,78 @@ app.post('/interactions', async function (req, res) {
       //var entries = db.getCollection("entries");
       //var results = entries.findOne({ id: userId });
       //console.log(req.body);
-            
-      console.log(moment.tz.countries());
-            
+          
+      const isDST = true;
+      const currentOffset = 360;
+      const offsetList = zonesMap.get(isDST).get(currentOffset);
+
+      console.log('currentOffset: ' + currentOffset);
+      console.log('offset list size: ' + offsetList.size);
+
+      console.log('List items: ');
+      for (const item of offsetList) {
+        console.log(item);
+      }
+      
+      //build Rows
+      let rowNum = 1;
+      let messageComponents = [];
+      
+      //build options
+      let options = [];
+      let count = 1;
+      let iterations = offsetList.size;
+      
+      for(const item of offsetList){
+                
+        let option = {};
+        option.label = item;
+        option.value = item;
+        //option.description = item;
+        options.push(option);
+        
+        iterations--;
+        if (count >=25 || (!iterations)) {
+          
+          //make row Component
+          let rowComponent = {};
+          rowComponent.type = MessageComponentTypes.STRING_SELECT;
+          rowComponent.custom_id = 'my_TZ_' + rowNum;
+          rowComponent.options = options;
+          
+          options = [];
+          
+          //Build row components
+          let rowComponents = [];
+          rowComponents.push(rowComponent);
+          
+          //make action row
+          let actionRow = {};
+          actionRow.type = MessageComponentTypes.ACTION_ROW;
+          actionRow.components = rowComponents;
+          
+          messageComponents.push(actionRow);
+          
+          count = 1;
+          rowNum++;
+                    
+        } else {
+          count++;
+        }
+      }
+      
       // Send a message into the channel where command was triggered from
       return res.send({
         type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
         data: {
-          // Fetches a random emoji to send from a helper function
-          content: "test",
+          content: 'Showing ' + count + ' of ' + offsetList.size + ' timezones',
+          flags: InteractionResponseFlags.EPHEMERAL,
+          // Selects are inside of action rows
+          components: messageComponents,
         },
       });
     }
-    
+                
     // "time" guild command
     if (name === 'time') {
       // Send a message into the channel where command was triggered from
@@ -110,10 +190,11 @@ app.post('/interactions', async function (req, res) {
       // User's object choice
       const objectName = req.body.data.options[0].value;
       if (objectName == 'timezone') {
+        //First ask if DST
         return res.send({
           type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
           data: {
-            content: 'A message with a button',
+            content: 'Do you have observe Daylight Savings or not?',
             flags: InteractionResponseFlags.EPHEMERAL,
             // Selects are inside of action rows
             components: [
@@ -123,18 +204,18 @@ app.post('/interactions', async function (req, res) {
                   {
                     type: MessageComponentTypes.STRING_SELECT,
                     // Value for your app to identify the select menu interactions
-                    custom_id: 'my_locale',
+                    custom_id: 'my_DST',
                     // Select options - see https://discord.com/developers/docs/interactions/message-components#select-menu-object-select-option-structure
                     options: [
                       {
-                        label: 'US/Central',
-                        value: 'US/Central',
-                        description: 'Central time US gmt -6',
+                        label: 'No Day Light Savings',
+                        value: "False",
+                        description: 'Not suffering from Benjamin Frankin\'s mistakes',
                       },
                       {
-                        label: 'US/Eastern',
-                        value: 'US/Eastern',
-                        description: 'Eastern time US gmt -4',
+                        label: 'Day Light Savings',
+                        value: "True",
+                        description: 'Twice a year I timeskip an hour',
                       },
                     ],
                   },
@@ -354,6 +435,119 @@ app.post('/interactions', async function (req, res) {
           components: [],
         },
       });
+    } else if (componentId === 'my_DST') {
+
+      // Get selected option from payload      
+      let selectedOption = false;   
+      if (data.values[0] == "True") {
+        selectedOption = true;
+      }
+      //get user ID
+      const userId = req.body.member.user.id;
+      // Get guild ID
+      const guildId = req.body.guild_id;
+      // build collection name
+      const collectionID = guildId + '_user_info';
+      // initialize collection
+      await databaseInitialize(collectionID);
+      
+      // get entries collection
+      var userInfos = db.getCollection(collectionID);
+      // check if user id exists
+      var result = userInfos.findOne({ id: userId });
+      
+      if (result) {
+        //if exists get doc and update
+        var doc = userInfos.by("id", userId);
+        doc.dst = selectedOption;
+        userInfos.update(doc)
+      } else {
+        //if doesn't exist, create doc
+        userInfos.insert({id: userId, dst: selectedOption});
+      }
+      
+      //get time
+      const d = new Date();
+      console.log(d.toLocaleTimeString('en-US', { hour: "2-digit", minute: "2-digit" }));
+      d.setMinutes(d.getMinutes() - 720);
+
+      //build options
+      let options = [];        
+      for(var i=-12; i<13; i++){
+        let option = {};
+        option.label = d.toLocaleTimeString('en-US', { hour: "2-digit", minute: "2-digit" }) + ' ' + i + '';
+        option.value = i * 60;
+        option.description = 'test'
+        options.push(option);
+        d.setMinutes(d.getMinutes() + 60);
+      }
+      //console.log(options);
+      
+      // Send results
+      await res.send({
+        type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+        data: {
+          content: 'Select your current time',
+          flags: InteractionResponseFlags.EPHEMERAL,
+          // Selects are inside of action rows
+          components: [
+            {
+              type: MessageComponentTypes.ACTION_ROW,
+              components: [
+                {
+                  type: MessageComponentTypes.STRING_SELECT,
+                  // Value for your app to identify the select menu interactions
+                  custom_id: 'my_Offset',
+                  // Select options - see https://discord.com/developers/docs/interactions/message-components#select-menu-object-select-option-structure
+                  options: options,
+                },
+              ],
+            },
+          ],
+        },
+      });
+      // Delete ephemeral message
+      await DiscordRequest(endpoint, {method: "DELETE" });
+    } else if (componentId === 'my_Offset') {
+
+      // Get selected option from payload
+      const selectedOption = data.values[0];
+      //get user ID
+      const userId = req.body.member.user.id;
+      // Get guild ID
+      const guildId = req.body.guild_id;
+      // build collection name
+      const collectionID = guildId + '_user_info';
+      // initialize collection
+      await databaseInitialize(collectionID);
+      
+      // get entries collection
+      var userInfos = db.getCollection(collectionID);
+      // check if user id exists
+      var result = userInfos.findOne({ id: userId });
+      
+      if (result) {
+        //if exists get doc and update
+        var doc = userInfos.by("id", userId);
+        
+        //check if user has DST
+        //check if currently in DST
+        //apply offset if needed
+        
+        doc.offset = selectedOption;
+        userInfos.update(doc)
+      } else {
+        //this should be an error
+        userInfos.insert({id: userId, offset: selectedOption});
+      }
+      
+      // Send results
+      await res.send({
+        type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+        data: { content: `<@${userId}> selected ${selectedOption}` },
+      });
+      // Delete ephemeral message
+      await DiscordRequest(endpoint, {method: "DELETE" });
     }
   }  
 });
