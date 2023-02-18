@@ -51,21 +51,21 @@ const zonesMap = new Map();
 
 for (const name of tzNames) {
   const isDST = (moment.tz('2020-05-05', name).isDST() || moment.tz('2020-12-12', name).isDST());  
-  const offsets = moment.tz.zone(name).offsets;
+  const offset = moment.tz(name).utcOffset();
+  
   if (!zonesMap.has(isDST)) {
     zonesMap.set(isDST, new Map());
   }
-  
-  for (const offset of offsets) {
-      if (!zonesMap.get(isDST).has(offset)) {
-          zonesMap.get(isDST).set(offset, new Set());
-      }
 
-      zonesMap.get(isDST).get(offset).add(name);
+  if (!zonesMap.get(isDST).has(offset)) {
+      zonesMap.get(isDST).set(offset, new Set());
   }
+  
+  zonesMap.get(isDST).get(offset).add(name);
+  
 }
 
-//console.log(moment.tz.zone('America/Barbados').offsets);
+//console.log(moment.tz('Asia/Jakarta').utcOffset());
 
 /**
  * Interactions endpoint URL where Discord will send HTTP requests
@@ -99,7 +99,7 @@ app.post('/interactions', async function (req, res) {
       //console.log(req.body);
           
       const isDST = true;
-      const currentOffset = 360;
+      const currentOffset = 480;
       const offsetList = zonesMap.get(isDST).get(currentOffset);
 
       console.log('currentOffset: ' + currentOffset);
@@ -535,7 +535,7 @@ app.post('/interactions', async function (req, res) {
       }
       
       //build timezone list using dst and offset
-      const currentOffset = -Number(selectedOption);
+      const currentOffset = Number(selectedOption);
       const offsetList = zonesMap.get(isDST).get(currentOffset);
       
       
