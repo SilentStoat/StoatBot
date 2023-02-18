@@ -51,21 +51,21 @@ const zonesMap = new Map();
 
 for (const name of tzNames) {
   const isDST = (moment.tz('2020-05-05', name).isDST() || moment.tz('2020-12-12', name).isDST());  
-  const offsets = moment.tz.zone(name).offsets;
+  const offset = moment.tz(name).utcOffset();
+  
   if (!zonesMap.has(isDST)) {
     zonesMap.set(isDST, new Map());
   }
-  
-  for (const offset of offsets) {
-      if (!zonesMap.get(isDST).has(offset)) {
-          zonesMap.get(isDST).set(offset, new Set());
-      }
 
-      zonesMap.get(isDST).get(offset).add(name);
+  if (!zonesMap.get(isDST).has(offset)) {
+      zonesMap.get(isDST).set(offset, new Set());
   }
+  
+  zonesMap.get(isDST).get(offset).add(name);
+  
 }
 
-//console.log(moment.tz.zone('America/Barbados').offsets);
+//console.log(moment.tz('Asia/Jakarta').utcOffset());
 
 /**
  * Interactions endpoint URL where Discord will send HTTP requests
@@ -99,7 +99,7 @@ app.post('/interactions', async function (req, res) {
       //console.log(req.body);
           
       const isDST = true;
-      const currentOffset = 360;
+      const currentOffset = 480;
       const offsetList = zonesMap.get(isDST).get(currentOffset);
 
       console.log('currentOffset: ' + currentOffset);
@@ -151,6 +151,7 @@ app.post('/interactions', async function (req, res) {
           
           count = 1;
           rowNum++;
+          //add a check to make sure no more than 5 rows
                     
         } else {
           count++;
@@ -311,13 +312,13 @@ app.post('/interactions', async function (req, res) {
       var result = userInfos.findOne({ id: userId });
       
       if (result) {        
-        if (result.locale) {
+        if (result.timeZone) {
           // Send a message into the channel where command was triggered from
           return res.send({
             type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
             data: {
               // Fetches a random emoji to send from a helper function
-              content: getTime(result.locale),
+              content: getTime(result.timeZone),
               //content: result.color,
             },
           });
@@ -526,19 +527,115 @@ app.post('/interactions', async function (req, res) {
       // check if user id exists
       var result = userInfos.findOne({ id: userId });
       
+      let isDST = false;
       if (result) {
         //if exists get doc and update
         var doc = userInfos.by("id", userId);
+        isDST = doc.dst;
+      }
+      
+      //build timezone list using dst and offset
+      const currentOffset = Number(selectedOption);
+      const offsetList = zonesMap.get(isDST).get(currentOffset);
+      
+      
+      //add check for empty timezone list
+      
+
+      console.log('currentOffset: ' + currentOffset);
+      console.log('offset list size: ' + offsetList.size);
+
+      console.log('List items: ');
+      for (const item of offsetList) {
+        console.log(item);
+      }
+      
+      //build Rows
+      let rowNum = 1;
+      let messageComponents = [];
+      
+      //build options
+      let options = [];
+      let count = 1;
+      let iterations = offsetList.size;
+      
+      for(const item of offsetList){
+                
+        let option = {};
+        option.label = item;
+        option.value = item;
+        //option.description = item;
+        options.push(option);
         
-        //check if user has DST
-        //check if currently in DST
-        //apply offset if needed
-        
-        doc.offset = selectedOption;
+        iterations--;
+        if (count >=25 || (!iterations)) {
+          
+          //make row Component
+          let rowComponent = {};
+          rowComponent.type = MessageComponentTypes.STRING_SELECT;
+          rowComponent.custom_id = 'my_TZ_' + rowNum;
+          rowComponent.options = options;
+          
+          options = [];
+          
+          //Build row components
+          let rowComponents = [];
+          rowComponents.push(rowComponent);
+          
+          //make action row
+          let actionRow = {};
+          actionRow.type = MessageComponentTypes.ACTION_ROW;
+          actionRow.components = rowComponents;
+          
+          messageComponents.push(actionRow);
+          
+          count = 1;
+          rowNum++;
+          //add a check to make sure no more than 5 rows
+                    
+        } else {
+          count++;
+        }
+      }
+            
+      // Send a message into the channel where command was triggered from
+      await res.send({
+        type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+        data: {
+          content: 'Showing ' + count + ' of ' + offsetList.size + ' timezones',
+          flags: InteractionResponseFlags.EPHEMERAL,
+          // Selects are inside of action rows
+          components: messageComponents,
+        },
+      });
+      // Delete ephemeral message
+      await DiscordRequest(endpoint, {method: "DELETE" });
+    } else if (componentId.startsWith('my_TZ_')) {
+
+      // Get selected option from payload
+      const selectedOption = data.values[0];
+      //get user ID
+      const userId = req.body.member.user.id;
+      // Get guild ID
+      const guildId = req.body.guild_id;
+      // build collection name
+      const collectionID = guildId + '_user_info';
+      // initialize collection
+      await databaseInitialize(collectionID);
+      
+      // get entries collection
+      var userInfos = db.getCollection(collectionID);
+      // check if user id exists
+      var result = userInfos.findOne({ id: userId });
+      
+      if (result) {
+        //if exists get doc and update
+        var doc = userInfos.by("id", userId);
+        doc.timeZone = selectedOption;
         userInfos.update(doc)
       } else {
-        //this should be an error
-        userInfos.insert({id: userId, offset: selectedOption});
+        //if doesn't exist, create doc
+        userInfos.insert({id: userId, timeZone: selectedOption});
       }
       
       // Send results
@@ -546,8 +643,14 @@ app.post('/interactions', async function (req, res) {
         type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
         data: { content: `<@${userId}> selected ${selectedOption}` },
       });
-      // Delete ephemeral message
-      await DiscordRequest(endpoint, {method: "DELETE" });
+      // Update ephemeral message
+      await DiscordRequest(endpoint, {
+        method: "PATCH",
+        body: {
+          content: "Nice choice " + getRandomEmoji(),
+          components: [],
+        },
+      });
     }
   }  
 });
