@@ -97,75 +97,51 @@ app.post('/interactions', async function (req, res) {
       //var entries = db.getCollection("entries");
       //var results = entries.findOne({ id: userId });
       //console.log(req.body);
-          
-      const isDST = true;
-      const currentOffset = 480;
-      const offsetList = zonesMap.get(isDST).get(currentOffset);
+      
+      //get list of users by timezone
+      
+      // build collection name
+      const collectionID = guildId + '_user_info';
+      // initialize collection
+      await databaseInitialize(collectionID);      
+      // get entries collection
+      var userInfos = db.getCollection(collectionID);
+      // get all users
+      let users = userInfos.find();
+      
+      // create users for each offset
+      const offsetMap = new Map();      
+      for (const user of users) {
+        const offset = moment.tz(user.timeZone).utcOffset(); //get user's offset
+        
+        if (!offsetMap.has(offset)) {
+          offsetMap.set(offset, new Set()); //add offset if it doesn't exist
+        }
 
-      console.log('currentOffset: ' + currentOffset);
-      console.log('offset list size: ' + offsetList.size);
-
-      console.log('List items: ');
-      for (const item of offsetList) {
-        console.log(item);
+        offsetMap.get(offset).add(user.id); //add user to offset
       }
       
-      //build Rows
-      let rowNum = 1;
-      let messageComponents = [];
+      //console.log(offsetMap);
       
-      //build options
-      let options = [];
-      let count = 1;
-      let iterations = offsetList.size;
-      
-      for(const item of offsetList){
-                
-        let option = {};
-        option.label = item;
-        option.value = item;
-        //option.description = item;
-        options.push(option);
-        
-        iterations--;
-        if (count >=25 || (!iterations)) {
-          
-          //make row Component
-          let rowComponent = {};
-          rowComponent.type = MessageComponentTypes.STRING_SELECT;
-          rowComponent.custom_id = 'my_TZ_' + rowNum;
-          rowComponent.options = options;
-          
-          options = [];
-          
-          //Build row components
-          let rowComponents = [];
-          rowComponents.push(rowComponent);
-          
-          //make action row
-          let actionRow = {};
-          actionRow.type = MessageComponentTypes.ACTION_ROW;
-          actionRow.components = rowComponents;
-          
-          messageComponents.push(actionRow);
-          
-          count = 1;
-          rowNum++;
-          //add a check to make sure no more than 5 rows
-                    
-        } else {
-          count++;
+      //build message content
+      let content = '';
+      for (const offset of offsetMap.keys()) {
+          content = content + moment().utcOffset(offset) + "\n";
+          const userIDs = offsetMap.get(offset);
+          console.log(userIDs);
+        for (const userID of userIDs) {
+          content = content + '<@' + userID + '> \n';
         }
       }
+    
       
       // Send a message into the channel where command was triggered from
       return res.send({
         type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
         data: {
-          content: 'Showing ' + count + ' of ' + offsetList.size + ' timezones',
+          content: content,
           flags: InteractionResponseFlags.EPHEMERAL,
           // Selects are inside of action rows
-          components: messageComponents,
         },
       });
     }
