@@ -126,7 +126,7 @@ app.post('/interactions', async function (req, res) {
       //build message content
       let content = '';
       for (const offset of offsetMap.keys()) {
-          content = content + moment().utcOffset(offset) + "\n";
+          content = content + moment().utcOffset(offset).format('HH:mm') + "\n";
           const userIDs = offsetMap.get(offset);
           console.log(userIDs);
         for (const userID of userIDs) {
